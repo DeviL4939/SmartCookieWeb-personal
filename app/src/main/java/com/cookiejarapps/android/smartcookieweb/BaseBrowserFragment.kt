@@ -279,6 +279,7 @@ abstract class BaseBrowserFragment : Fragment(), UserInteractionHandler, Activit
                     browserEngine.behavior = null
                     browserEngine.bottomMargin = toolbarHeight
                     browserEngine.topMargin = 0
+                    binding.swipeRefresh.layoutParams = browserEngine
                     binding.swipeRefresh.apply {
                         translationY = 0f
                         requestLayout()
@@ -605,9 +606,13 @@ abstract class BaseBrowserFragment : Fragment(), UserInteractionHandler, Activit
                 binding.swipeRefresh.layoutParams as CoordinatorLayout.LayoutParams
             if (UserPreferences(context).shouldUseBottomToolbar) {
                 swipeRefreshParams.bottomMargin = toolbarHeight
+                swipeRefreshParams.topMargin = 0
             } else {
                 swipeRefreshParams.topMargin = toolbarHeight
+                swipeRefreshParams.bottomMargin = 0
             }
+            binding.swipeRefresh.layoutParams = swipeRefreshParams
+            binding.swipeRefresh.requestLayout()
         }
     }
 
@@ -870,9 +875,9 @@ abstract class BaseBrowserFragment : Fragment(), UserInteractionHandler, Activit
             val browserEngine = binding.swipeRefresh.layoutParams as CoordinatorLayout.LayoutParams
             browserEngine.bottomMargin = 0
             browserEngine.topMargin = 0
-            binding.swipeRefresh.translationY = 0f
-
             browserEngine.behavior = null
+            binding.swipeRefresh.layoutParams = browserEngine
+            binding.swipeRefresh.translationY = 0f
 
             binding.engineView.setDynamicToolbarMaxHeight(0)
             binding.engineView.setVerticalClipping(0)

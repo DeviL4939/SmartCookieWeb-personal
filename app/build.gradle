@@ -123,10 +123,6 @@ dependencies {
     kapt "com.google.dagger:dagger-android-processor:$daggerVersion"
     compileOnly 'javax.annotation:jsr250-api:1.0'
 
-    final def butterKnifeVersion = '10.2.3'
-    implementation "com.jakewharton:butterknife:$butterKnifeVersion"
-    kapt "com.jakewharton:butterknife-compiler:$butterKnifeVersion"
-
     final def mozComponentsVersion = "145.0"
 
     // Mozilla compose components

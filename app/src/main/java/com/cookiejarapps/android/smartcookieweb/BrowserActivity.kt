@@ -174,9 +174,13 @@ open class BrowserActivity : LocaleAwareAppCompatActivity(), ComponentCallbacks2
                 WindowInsetsCompat.Type.systemBars()
                         or WindowInsetsCompat.Type.displayCutout()
             )
+            // Only apply top padding (status bar space) when using top toolbar
+            // to prevent black bar when using bottom toolbar
+            val topPadding = if (UserPreferences(this).shouldUseBottomToolbar) 0 else bars.top
+            
             v.updatePadding(
                 left = bars.left,
-                top = bars.top,
+                top = topPadding,
                 right = bars.right,
                 bottom = bars.bottom,
             )
@@ -295,6 +299,16 @@ open class BrowserActivity : LocaleAwareAppCompatActivity(), ComponentCallbacks2
 
             isToolbarInflated = true
         }
+        
+        // Hide navigation toolbar when using bottom toolbar to prevent black bar
+        if (UserPreferences(this).shouldUseBottomToolbar) {
+            navigationToolbar.visibility = android.view.View.GONE
+            navigationToolbar.layoutParams?.height = 0
+        } else {
+            navigationToolbar.visibility = android.view.View.VISIBLE
+            navigationToolbar.layoutParams?.height = resources.getDimensionPixelSize(R.dimen.browser_toolbar_height)
+        }
+        
         return supportActionBar!!
     }
 
