@@ -130,15 +130,9 @@ class DefaultBrowserToolbarMenuController(
                 }
             }
             is ToolbarMenu.Item.Bookmarks -> {
-                val drawerLayout = activity.findViewById<DrawerLayout>(R.id.drawer_layout)
-                val bookmarksDrawer =
-                    if (UserPreferences(activity).swapDrawers) activity.findViewById<FrameLayout>(
-                        R.id.left_drawer
-                    ) else activity.findViewById(R.id.right_drawer)
-
-                if (bookmarksDrawer != null) {
-                    drawerLayout?.openDrawer(bookmarksDrawer)
-                }
+                // Show bookmarks bottom sheet instead of drawer
+                val bookmarksBottomSheet = com.cookiejarapps.android.smartcookieweb.browser.bookmark.ui.BookmarksBottomSheetFragment.newInstance()
+                bookmarksBottomSheet.show(activity.supportFragmentManager, "BookmarksBottomSheet")
             }
             is ToolbarMenu.Item.History -> browserAnimator.captureEngineViewAndDrawStatically {
                 val settings = Intent(activity, HistoryActivity::class.java)

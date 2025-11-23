@@ -1,0 +1,422 @@
+package com.cookiejarapps.android.smartcookieweb.browser.bookmark.ui
+
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.cookiejarapps.android.smartcookieweb.R
+import com.cookiejarapps.android.smartcookieweb.browser.BookmarkSortType
+import com.cookiejarapps.android.smartcookieweb.browser.bookmark.items.BookmarkFolderItem
+import com.cookiejarapps.android.smartcookieweb.browser.bookmark.items.BookmarkItem
+import com.cookiejarapps.android.smartcookieweb.browser.bookmark.items.BookmarkSiteItem
+import com.cookiejarapps.android.smartcookieweb.browser.bookmark.repository.BookmarkManager
+import com.cookiejarapps.android.smartcookieweb.databinding.FragmentBookmarksBottomSheetBinding
+import com.cookiejarapps.android.smartcookieweb.ext.components
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import mozilla.components.browser.state.selector.selectedTab
+
+class BookmarksBottomSheetFragment : BottomSheetDialogFragment(), BookmarkAdapter.OnBookmarkRecyclerListener {
+    
+    private var _binding: FragmentBookmarksBottomSheetBinding? = null
+    private val binding get() = _binding!!
+    
+    private lateinit var bookmarkAdapter: BookmarkAdapter
+    private lateinit var manager: BookmarkManager
+    private lateinit var currentFolder: BookmarkFolderItem
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentBookmarksBottomSheetBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        
+        setupBookmarkManager()
+        setupRecyclerView()
+        setupClickListeners()
+        loadBookmarks()
+    }
+
+    private fun setupBookmarkManager() {
+        manager = BookmarkManager.getInstance(requireActivity())
+        currentFolder = manager.root
+    }
+
+    private fun setupRecyclerView() {
+        binding.bookmarksRecyclerView.apply {
+            layoutManager = LinearLayoutManager(context)
+        }
+    }
+
+    private fun loadBookmarks() {
+        setBookmarkList(currentFolder)
+    }
+
+    private fun setBookmarkList(folder: BookmarkFolderItem) {
+        currentFolder = folder
+        
+        // Create adapter with current folder's items
+        bookmarkAdapter = BookmarkAdapter(requireContext(), folder.itemList, this)
+        binding.bookmarksRecyclerView.adapter = bookmarkAdapter
+        
+        if (folder.itemList.isEmpty()) {
+            showEmptyState()
+        } else {
+            hideEmptyState()
+        }
+        
+        // Update navigation UI based on current folder
+        if (folder == manager.root) {
+            // At root level
+            binding.backButton.visibility = View.GONE
+            binding.bookmarksTitle.text = getString(R.string.action_bookmarks)
+            binding.pathView.visibility = View.GONE
+        } else {
+            // In a subfolder
+            binding.backButton.visibility = View.VISIBLE
+            binding.bookmarksTitle.text = folder.title
+            binding.pathView.visibility = View.VISIBLE
+            // TODO: Update path breadcrumbs
+        }
+    }
+
+    private fun setupClickListeners() {
+        binding.addBookmarkButton.setOnClickListener {
+            // Show add bookmark dialog (similar to original implementation)
+            showAddBookmarkDialog()
+        }
+        
+        binding.sortBookmarksButton.setOnClickListener {
+            // Show sort options dialog
+            showSortDialog()
+        }
+        
+        binding.backButton.setOnClickListener {
+            // Navigate back to parent folder
+            currentFolder.parent?.let { parentFolder ->
+                setBookmarkList(parentFolder)
+            } ?: run {
+                // Already at root, go back to root
+                setBookmarkList(manager.root)
+            }
+        }
+    }
+
+    private fun showAddBookmarkDialog() {
+        // Show add bookmark dialog for current page
+        val store = requireContext().components.store
+        val selectedTab = store.state.selectedTab
+        val title = selectedTab?.content?.title ?: ""
+        val url = selectedTab?.content?.url ?: ""
+        
+        val dialog = AddBookmarkSiteDialog(requireActivity(), title, url)
+        dialog.setOnClickListener { _, _ ->
+            // Refresh the bookmark list after adding
+            setBookmarkList(currentFolder)
+        }
+        dialog.show()
+    }
+
+    private fun showSortDialog() {
+        val items = arrayOf(
+            getString(R.string.sort_by_name),
+            getString(R.string.sort_by_url),
+            getString(R.string.sort_by_date_added)
+        )
+        
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(getString(R.string.sort))
+            .setItems(items) { _, which ->
+                val sortType = when (which) {
+                    0 -> BookmarkSortType.A_Z
+                    1 -> BookmarkSortType.A_Z // URL sorting not implemented in original
+                    2 -> BookmarkSortType.A_Z // Date sorting not implemented in original
+                    else -> BookmarkSortType.A_Z
+                }
+                bookmarkAdapter.sortBookmarks(sortType)
+            }
+            .create()
+        dialog.show()
+    }
+
+    private fun showEmptyState() {
+        binding.emptyStateLayout.visibility = View.VISIBLE
+        binding.bookmarksRecyclerView.visibility = View.GONE
+    }
+
+    private fun hideEmptyState() {
+        binding.emptyStateLayout.visibility = View.GONE
+        binding.bookmarksRecyclerView.visibility = View.VISIBLE
+    }
+
+    // BookmarkAdapter.OnBookmarkRecyclerListener implementation - required methods
+    override fun onIconClick(v: View, position: Int) {
+        val item = bookmarkAdapter[position]
+        if (item is BookmarkSiteItem) {
+            onShowMenu(v, position)
+        }
+    }
+
+    override fun onShowMenu(v: View, position: Int) {
+        android.util.Log.d("BookmarksBottomSheet", "onShowMenu called for position: $position")
+        val item = currentFolder[position]
+        android.util.Log.d("BookmarksBottomSheet", "Item: ${item.javaClass.simpleName} - ${item.title}")
+        
+        // Create context menu with bookmark actions
+        try {
+            android.util.Log.d("BookmarksBottomSheet", "Creating popup menu for ${item.javaClass.simpleName}")
+            val popup = androidx.appcompat.widget.PopupMenu(requireContext(), v)
+            
+            val menuRes = when (item) {
+                is BookmarkSiteItem -> {
+                    android.util.Log.d("BookmarksBottomSheet", "Using bookmark_site_menu")
+                    R.menu.bookmark_site_menu
+                }
+                is BookmarkFolderItem -> {
+                    android.util.Log.d("BookmarksBottomSheet", "Using bookmark_folder_menu")
+                    R.menu.bookmark_folder_menu
+                }
+                else -> {
+                    android.util.Log.e("BookmarksBottomSheet", "Unknown item type, returning")
+                    return
+                }
+            }
+            
+            popup.menuInflater.inflate(menuRes, popup.menu)
+            android.util.Log.d("BookmarksBottomSheet", "Menu inflated, showing popup")
+        
+        popup.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.editBookmark -> {
+                    editBookmark(item, position)
+                    true
+                }
+                R.id.deleteBookmark -> {
+                    deleteBookmark(item, position)
+                    true
+                }
+                R.id.open -> {
+                    if (item is BookmarkSiteItem) {
+                        requireContext().components.tabsUseCases.addTab.invoke(
+                            url = item.url,
+                            selectTab = true
+                        )
+                        dismiss()
+                    }
+                    true
+                }
+                R.id.openNew -> {
+                    if (item is BookmarkSiteItem) {
+                        requireContext().components.tabsUseCases.addTab.invoke(
+                            url = item.url,
+                            selectTab = false
+                        )
+                    }
+                    true
+                }
+                R.id.openBg -> {
+                    if (item is BookmarkSiteItem) {
+                        requireContext().components.tabsUseCases.addTab.invoke(
+                            url = item.url,
+                            selectTab = false
+                        )
+                    }
+                    true
+                }
+                R.id.share -> {
+                    if (item is BookmarkSiteItem) {
+                        // Share the bookmark URL
+                        val shareIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, item.url)
+                            type = "text/plain"
+                        }
+                        startActivity(android.content.Intent.createChooser(shareIntent, getString(R.string.share)))
+                    }
+                    true
+                }
+                R.id.moveBookmark -> {
+                    // Show folder selection dialog to move bookmark
+                    showMoveFolderDialog(item, position)
+                    true
+                }
+                R.id.addShortcut -> {
+                    // TODO: Implement add shortcut functionality  
+                    true
+                }
+                else -> false
+            }
+            }
+            
+            popup.show()
+            android.util.Log.d("BookmarksBottomSheet", "Popup menu shown successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("BookmarksBottomSheet", "Error showing popup menu", e)
+        }
+    }
+
+    override fun onSelectionStateChange(items: Int) {
+        // Handle selection state changes if needed
+    }
+
+    override fun onRecyclerItemClicked(v: View, position: Int) {
+        when (val item = currentFolder[position]) {
+            is BookmarkSiteItem -> {
+                // Open bookmark URL and dismiss bottom sheet
+                requireContext().components.tabsUseCases.addTab.invoke(
+                    url = item.url,
+                    selectTab = true
+                )
+                dismiss()
+            }
+            is BookmarkFolderItem -> {
+                // Navigate into folder
+                setBookmarkList(item)
+            }
+        }
+    }
+
+    override fun onRecyclerItemLongClicked(v: View, position: Int): Boolean {
+        // Handle long click - could show context menu
+        onShowMenu(binding.bookmarksRecyclerView, position)
+        return true
+    }
+
+    private fun editBookmark(item: BookmarkItem, position: Int) {
+        when (item) {
+            is BookmarkSiteItem -> {
+                // Show edit bookmark dialog
+                val dialog = AddBookmarkSiteDialog(requireActivity(), item.title ?: "", item.url)
+                dialog.setOnClickListener { _, _ ->
+                    // Refresh the bookmark list after editing
+                    setBookmarkList(currentFolder)
+                }
+                dialog.show()
+            }
+            is BookmarkFolderItem -> {
+                // Show edit folder dialog
+                val dialog = AddBookmarkFolderDialog(requireActivity(), manager, item)
+                dialog.setOnClickListener { _, _ ->
+                    // Refresh the bookmark list after editing
+                    setBookmarkList(currentFolder)
+                }
+                dialog.show()
+            }
+        }
+    }
+
+    private fun deleteBookmark(item: BookmarkItem, position: Int) {
+        // Show confirmation dialog
+        val message = when (item) {
+            is BookmarkSiteItem -> getString(R.string.delete_bookmark_confirm, item.title ?: "")
+            is BookmarkFolderItem -> getString(R.string.delete_folder_confirm, item.title ?: "")
+            else -> getString(R.string.delete_confirm)
+        }
+        
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(R.string.delete_confirm_title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                // Delete the bookmark
+                try {
+                    currentFolder.itemList.remove(item)
+                    // Refresh the bookmark list
+                    setBookmarkList(currentFolder)
+                } catch (e: Exception) {
+                    // Handle deletion error
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showMoveFolderDialog(item: BookmarkItem, position: Int) {
+        // Get all available folders (excluding the item itself if it's a folder)
+        val allFolders = mutableListOf<BookmarkFolderItem>()
+        
+        // Add root folder as option
+        allFolders.add(manager.root)
+        
+        // Recursively collect all folders
+        collectAllFolders(manager.root, allFolders, item)
+        
+        // Create folder names for display
+        val folderNames = allFolders.map { folder ->
+            if (folder == manager.root) {
+                getString(R.string.action_bookmarks) + " (Root)"
+            } else {
+                folder.title ?: "Unnamed Folder"
+            }
+        }.toTypedArray()
+        
+        // Show selection dialog
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Move to folder")
+            .setItems(folderNames) { _, which ->
+                val selectedFolder = allFolders[which]
+                moveItemToFolder(item, selectedFolder)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+    
+    private fun collectAllFolders(folder: BookmarkFolderItem, result: MutableList<BookmarkFolderItem>, excludeItem: BookmarkItem?) {
+        // Add subfolders to the result (excluding the item being moved if it's a folder)
+        for (i in 0 until folder.size()) {
+            val child = folder[i]
+            if (child is BookmarkFolderItem && child != excludeItem) {
+                result.add(child)
+                // Recursively collect subfolders
+                collectAllFolders(child, result, excludeItem)
+            }
+        }
+    }
+    
+    private fun moveItemToFolder(item: BookmarkItem, targetFolder: BookmarkFolderItem) {
+        try {
+            // Remove from current parent
+            currentFolder.itemList.remove(item)
+            
+            // Add to new parent
+            targetFolder.add(item)
+            
+            // Note: Parent reference is automatically updated when adding to target folder
+            // The BookmarkItem parent property is managed by the folder structure
+            
+            // Refresh the current view
+            setBookmarkList(currentFolder)
+            
+            // Show success message
+            android.widget.Toast.makeText(
+                requireContext(), 
+                "Moved \"${item.title}\" to \"${if (targetFolder == manager.root) "Root" else targetFolder.title}\"", 
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("BookmarksBottomSheet", "Error moving bookmark", e)
+            android.widget.Toast.makeText(
+                requireContext(), 
+                "Error moving bookmark", 
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    companion object {
+        fun newInstance(): BookmarksBottomSheetFragment {
+            return BookmarksBottomSheetFragment()
+        }
+    }
+}

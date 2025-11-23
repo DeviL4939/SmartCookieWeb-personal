@@ -538,12 +538,9 @@ class HomeFragment : Fragment() {
                         requireActivity().startActivity(settings)
                     }
                     HomeMenu.Item.Bookmarks -> {
-                        val drawerLayout = activity?.findViewById<DrawerLayout>(R.id.drawer_layout)
-                        val bookmarksDrawer = if(UserPreferences(requireContext()).swapDrawers) requireActivity().findViewById<FrameLayout>(R.id.left_drawer) else requireActivity().findViewById<FrameLayout>(R.id.right_drawer)
-
-                        if (bookmarksDrawer != null) {
-                            drawerLayout?.openDrawer(bookmarksDrawer)
-                        }
+                        // Show bookmarks bottom sheet instead of drawer
+                        val bookmarksBottomSheet = com.cookiejarapps.android.smartcookieweb.browser.bookmark.ui.BookmarksBottomSheetFragment.newInstance()
+                        bookmarksBottomSheet.show(parentFragmentManager, "BookmarksBottomSheet")
                     }
                     HomeMenu.Item.History -> {
                         val settings = Intent(activity, HistoryActivity::class.java)
@@ -695,11 +692,9 @@ class HomeFragment : Fragment() {
                                     requireActivity().startActivity(settings)
                                 }
                                 HomeMenu.Item.Bookmarks -> {
-                                    val drawerLayout = activity?.findViewById<DrawerLayout>(R.id.drawer_layout)
-                                    val bookmarksDrawer = if(UserPreferences(requireContext()).swapDrawers) 
-                                        requireActivity().findViewById<FrameLayout>(R.id.left_drawer) 
-                                    else requireActivity().findViewById<FrameLayout>(R.id.right_drawer)
-                                    bookmarksDrawer?.let { drawerLayout?.openDrawer(it) }
+                                    // Show bookmarks bottom sheet instead of drawer
+                                    val bookmarksBottomSheet = com.cookiejarapps.android.smartcookieweb.browser.bookmark.ui.BookmarksBottomSheetFragment.newInstance()
+                                    bookmarksBottomSheet.show(parentFragmentManager, "BookmarksBottomSheet")
                                 }
                                 HomeMenu.Item.History -> {
                                     val settings = Intent(activity, HistoryActivity::class.java)
