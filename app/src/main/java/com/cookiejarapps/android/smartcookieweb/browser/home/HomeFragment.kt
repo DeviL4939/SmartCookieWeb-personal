@@ -46,6 +46,7 @@ import com.cookiejarapps.android.smartcookieweb.browser.shortcuts.ShortcutGridAd
 import com.cookiejarapps.android.smartcookieweb.databinding.FragmentHomeBinding
 import com.cookiejarapps.android.smartcookieweb.ext.components
 import com.cookiejarapps.android.smartcookieweb.ext.nav
+import com.cookiejarapps.android.smartcookieweb.toolbar.ContextualBottomToolbar
 import com.cookiejarapps.android.smartcookieweb.history.HistoryActivity
 import com.cookiejarapps.android.smartcookieweb.preferences.UserPreferences
 import com.cookiejarapps.android.smartcookieweb.settings.HomepageChoice
@@ -392,6 +393,9 @@ class HomeFragment : Fragment() {
 
         observeSearchEngineChanges()
         createHomeMenu(requireContext(), WeakReference(binding.menuButton))
+        
+        // Setup contextual bottom toolbar
+        setupContextualBottomToolbar()
 
         binding.gestureLayout.addGestureListener(
             ToolbarGestureHandler(
@@ -572,6 +576,198 @@ class HomeFragment : Fragment() {
         }
 
         binding.tabButton.setCountWithAnimation(tabCount)
+        
+        // Also update the contextual bottom toolbar if it's visible
+        updateContextualToolbarForHomepage()
+    }
+
+    private fun setupContextualBottomToolbar() {
+        val toolbar = binding.contextualBottomToolbar
+        
+        // Show bottom toolbar when enabled in settings
+        val showBottomToolbar = UserPreferences(requireContext()).shouldUseBottomToolbar
+        if (showBottomToolbar) {
+            toolbar.visibility = View.VISIBLE
+            // Show address bar but hide redundant elements when bottom toolbar is enabled
+            binding.toolbarLayout.visibility = View.VISIBLE
+            binding.tabButton.visibility = View.GONE // Hide tab counter (we have it in bottom toolbar)
+            binding.menuButton.visibility = View.GONE // Hide old menu button (we have it in bottom toolbar)
+        } else {
+            toolbar.visibility = View.GONE
+            // Show original layout when bottom toolbar is disabled
+            binding.toolbarLayout.visibility = View.VISIBLE
+            binding.tabButton.visibility = View.VISIBLE
+            binding.menuButton.visibility = View.VISIBLE
+        }
+        
+        if (showBottomToolbar) {
+            // Set up bottom toolbar listener only when bottom toolbar is enabled
+            toolbar.listener = object : ContextualBottomToolbar.ContextualToolbarListener {
+                override fun onBackClicked() {
+                    // On homepage, back button should be disabled, but kept for consistency
+                }
+
+                override fun onForwardClicked() {
+                    // Forward not applicable on homepage
+                }
+
+                override fun onShareClicked() {
+                    // Share not applicable on homepage, kept for consistency
+                }
+
+                override fun onSearchClicked() {
+                    // Focus on search - same as clicking the search bar
+                    navigateToSearch()
+                }
+
+                override fun onNewTabClicked() {
+                    // Add new tab
+                    browsingModeManager.mode = BrowsingMode.Normal
+                    when(UserPreferences(requireContext()).homepageType){
+                        HomepageChoice.VIEW.ordinal -> {
+                            components.tabsUseCases.addTab.invoke("about:homepage", selectTab = true)
+                        }
+                        HomepageChoice.BLANK_PAGE.ordinal -> {
+                            components.tabsUseCases.addTab.invoke("about:blank", selectTab = true)
+                        }
+                        HomepageChoice.CUSTOM_PAGE.ordinal -> {
+                            components.tabsUseCases.addTab.invoke(
+                                UserPreferences(requireContext()).customHomepageUrl,
+                                selectTab = true
+                            )
+                        }
+                    }
+                }
+
+                override fun onTabCountClicked() {
+                    // Open tabs bottom sheet
+                    openTabDrawer()
+                }
+
+                override fun onMenuClicked() {
+                    // Create and show the home menu anchored to the bottom toolbar button
+                    val context = requireContext()
+                    val bottomMenuButton = binding.contextualBottomToolbar.findViewById<View>(R.id.menu_button)
+                    
+                    // Create home menu directly and show it
+                    val homeMenu = HomeMenu(
+                        lifecycleOwner = viewLifecycleOwner,
+                        context = context,
+                        onItemTapped = { item ->
+                            when (item) {
+                                HomeMenu.Item.NewTab -> {
+                                    browsingModeManager.mode = BrowsingMode.Normal
+                                    when(UserPreferences(requireContext()).homepageType){
+                                        HomepageChoice.VIEW.ordinal -> {
+                                            components.tabsUseCases.addTab.invoke("about:homepage", selectTab = true)
+                                        }
+                                        HomepageChoice.BLANK_PAGE.ordinal -> {
+                                            components.tabsUseCases.addTab.invoke("about:blank", selectTab = true)
+                                        }
+                                        HomepageChoice.CUSTOM_PAGE.ordinal -> {
+                                            components.tabsUseCases.addTab.invoke(
+                                                UserPreferences(requireContext()).customHomepageUrl,
+                                                selectTab = true
+                                            )
+                                        }
+                                    }
+                                }
+                                HomeMenu.Item.NewPrivateTab -> {
+                                    browsingModeManager.mode = BrowsingMode.Private
+                                    when(UserPreferences(requireContext()).homepageType){
+                                        HomepageChoice.VIEW.ordinal -> {
+                                            components.tabsUseCases.addTab.invoke("about:homepage", selectTab = true, private = true)
+                                        }
+                                        HomepageChoice.BLANK_PAGE.ordinal -> {
+                                            components.tabsUseCases.addTab.invoke("about:blank", selectTab = true, private = true)
+                                        }
+                                        HomepageChoice.CUSTOM_PAGE.ordinal -> {
+                                            components.tabsUseCases.addTab.invoke(
+                                                UserPreferences(requireContext()).customHomepageUrl,
+                                                selectTab = true, private = true
+                                            )
+                                        }
+                                    }
+                                }
+                                HomeMenu.Item.Settings -> {
+                                    val settings = Intent(activity, SettingsActivity::class.java)
+                                    settings.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    requireActivity().startActivity(settings)
+                                }
+                                HomeMenu.Item.Bookmarks -> {
+                                    val drawerLayout = activity?.findViewById<DrawerLayout>(R.id.drawer_layout)
+                                    val bookmarksDrawer = if(UserPreferences(requireContext()).swapDrawers) 
+                                        requireActivity().findViewById<FrameLayout>(R.id.left_drawer) 
+                                    else requireActivity().findViewById<FrameLayout>(R.id.right_drawer)
+                                    bookmarksDrawer?.let { drawerLayout?.openDrawer(it) }
+                                }
+                                HomeMenu.Item.History -> {
+                                    val settings = Intent(activity, HistoryActivity::class.java)
+                                    settings.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    activity?.startActivity(settings)
+                                }
+                                HomeMenu.Item.AddonsManager -> {
+                                    val settings = Intent(activity, AddonsActivity::class.java)
+                                    settings.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    activity?.startActivity(settings)
+                                }
+                                else -> {}
+                            }
+                        },
+                        onMenuBuilderChanged = { menuBuilder ->
+                            val menu = menuBuilder.build(context)
+                            
+                            // Create a temporary view above the button for better positioning
+                            val tempView = android.view.View(context)
+                            tempView.layoutParams = android.view.ViewGroup.LayoutParams(1, 1)
+                            
+                            // Add the temp view to the parent layout
+                            val parent = binding.contextualBottomToolbar
+                            parent.addView(tempView)
+                            
+                            // Position the temp view above the menu button
+                            tempView.x = bottomMenuButton.x
+                            tempView.y = bottomMenuButton.y - 60 // 60px above the button
+                            
+                            // Show menu anchored to temp view
+                            menu.show(anchor = tempView)
+                            
+                            // Clean up temp view after menu interaction
+                            tempView.postDelayed({
+                                try {
+                                    parent.removeView(tempView)
+                                } catch (e: Exception) {
+                                    // Ignore if view was already removed
+                                }
+                            }, 3000) // 3 seconds cleanup delay
+                        }
+                    )
+                }
+            }
+            
+            // Update toolbar context for homepage
+            updateContextualToolbarForHomepage()
+        }
+    }
+
+    private fun updateContextualToolbarForHomepage() {
+        val toolbar = binding.contextualBottomToolbar
+        if (toolbar.visibility == View.VISIBLE) {
+            val store = requireContext().components.store.state
+            val tabCount = if (browsingModeManager.mode.isPrivate) {
+                store.privateTabs.size
+            } else {
+                store.normalTabs.size
+            }
+            
+            toolbar.updateForContext(
+                tab = null, // No specific tab on homepage
+                canGoBack = false, // Can't go back from homepage
+                canGoForward = false, // Can't go forward from homepage
+                tabCount = tabCount,
+                isHomepage = true // This is the homepage
+            )
+        }
     }
 
     companion object {

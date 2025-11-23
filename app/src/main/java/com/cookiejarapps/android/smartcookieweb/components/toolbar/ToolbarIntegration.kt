@@ -54,6 +54,10 @@ abstract class ToolbarIntegration(
 
     init {
         toolbar.display.menuBuilder = toolbarMenu.menuBuilder
+        // Hide menu button from toolbar if bottom toolbar is enabled (but keep menu functionality)
+        if (UserPreferences(context).shouldUseBottomToolbar) {
+            toolbar.display.menuBuilder = null
+        }
         toolbar.private = isPrivate
     }
 
@@ -96,6 +100,10 @@ class DefaultToolbarIntegration(
 
     init {
         toolbar.display.menuBuilder = toolbarMenu.menuBuilder
+        // Hide menu button from toolbar if bottom toolbar is enabled (but keep menu functionality)
+        if (UserPreferences(context).shouldUseBottomToolbar) {
+            toolbar.display.menuBuilder = null
+        }
         toolbar.private = isPrivate
 
         toolbar.display.indicators =
@@ -129,23 +137,26 @@ class DefaultToolbarIntegration(
             toolbar.display.setUrlBackground(AppCompatResources.getDrawable(context, R.drawable.toolbar_background_private))
         }
 
-        val tabsAction = TabCounterToolbarButton(
-            lifecycleOwner = lifecycleOwner,
-            showTabs = {
-                toolbar.hideKeyboard()
-                interactor.onTabCounterClicked()
-            },
-            store = store
-        )
+        // Only add tab counter if bottom toolbar is disabled
+        if (!UserPreferences(context).shouldUseBottomToolbar) {
+            val tabsAction = TabCounterToolbarButton(
+                lifecycleOwner = lifecycleOwner,
+                showTabs = {
+                    toolbar.hideKeyboard()
+                    interactor.onTabCounterClicked()
+                },
+                store = store
+            )
 
-        val tabCount = if (isPrivate) {
-            store.state.privateTabs.size
-        } else {
-            store.state.normalTabs.size
+            val tabCount = if (isPrivate) {
+                store.state.privateTabs.size
+            } else {
+                store.state.normalTabs.size
+            }
+
+            tabsAction.updateCount(tabCount)
+
+            toolbar.addNavigationAction(tabsAction)
         }
-
-        tabsAction.updateCount(tabCount)
-
-        toolbar.addNavigationAction(tabsAction)
     }
 }

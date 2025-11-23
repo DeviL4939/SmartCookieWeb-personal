@@ -119,6 +119,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
+            android:layout_marginBottom="56dp"
             android:elevation="5dp"
             tools:context=".home.HomeFragment">
 
@@ -206,5 +207,13 @@
             android:clickable="false"
             android:focusable="false"
             android:visibility="gone" />
+
+        <!-- Contextual Bottom Toolbar -->
+        <com.cookiejarapps.android.smartcookieweb.toolbar.ContextualBottomToolbar
+            android:id="@+id/contextualBottomToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="visible"
+            android:layout_gravity="bottom" />
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </com.cookiejarapps.android.smartcookieweb.browser.SwipeGestureLayout>

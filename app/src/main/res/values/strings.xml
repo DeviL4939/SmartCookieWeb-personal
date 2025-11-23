@@ -352,5 +352,11 @@
   
   <!-- AwesomeBar related strings -->
   <string name="switch_to_tab">Switch to tab</string>
+  
+  <!-- Contextual Bottom Toolbar strings -->
+  <string name="back">Back</string>
+  <string name="share">Share</string>
+  <string name="menu">Menu</string>
+  <string name="tabs_count_description">%d tabs open</string>
 
 </resources>
